@@ -17,14 +17,24 @@ DAYS_MAP = {
 alarm_list = []
 
 def add_alarm(alarm_time, days, concept):
-    """Función para agregar una alarma a la lista"""
-    alarm = {
-        'time': alarm_time,       # Hora de la alarma
-        'days': days,             # Días de la semana para la alarma
-        'concept': concept        # Concepto o descripción de la alarma
-    }
-    alarm_list.append(alarm)
-    print(f"Alarma agregada: {concept} a las {alarm_time} en los días {days}")
+    """Función para agregar o actualizar una alarma en la lista"""
+    for day in days:
+        # Verificar si ya existe una alarma en la misma hora y día
+        existing_alarm = next((alarm for alarm in alarm_list if alarm['time'] == alarm_time and day in alarm['days']), None)
+
+        if existing_alarm:
+            # Concatenar el concepto si la alarma ya existe para ese día y hora
+            existing_alarm['concept'] += f", {concept}"
+            print(f"Alarma actualizada: {existing_alarm['concept']} a las {alarm_time} en el día {day}")
+        else:
+            # Crear una nueva alarma
+            alarm = {
+                'time': alarm_time,       # Hora de la alarma
+                'days': [day],            # Días de la semana para la alarma
+                'concept': concept        # Concepto o descripción de la alarma
+            }
+            alarm_list.append(alarm)
+            print(f"Alarma agregada: {concept} a las {alarm_time} en el día {day}")
 
 def check_alarms():
     """Función para verificar y activar las alarmas si coinciden con la hora y día actual"""
@@ -56,7 +66,7 @@ if __name__ == "__main__":
         # Convertir los días ingresados a números de 0 (lunes) a 6 (domingo)
         alarm_days = [DAYS_MAP[day.strip()] for day in days_input if day.strip() in DAYS_MAP]
 
-        # Agregar la alarma a la lista
+        # Agregar la alarma a la lista (verificará si existe o no una alarma con la misma hora y día)
         add_alarm(alarm_time, alarm_days, concept)
 
         # Preguntar si se quiere agregar otra alarma
