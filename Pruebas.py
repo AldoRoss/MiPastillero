@@ -1,107 +1,78 @@
-import pyaudio
-import wave
-import tkinter as tk
-from threading import Thread
-import speech_recognition as sr
+import datetime
+import time
+from playsound import playsound
 
-# Configuración para grabar audio
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
-CHUNK = 1024
-OUTPUT_FILENAME = "audio_recorded.wav"
-frames = []  # Para almacenar los fragmentos de audio
-stream = None
-audio = None
+# Mapa de días de la semana
+DAYS_MAP = {
+    'lunes': 0,
+    'martes': 1,
+    'miércoles': 2,
+    'jueves': 3,
+    'viernes': 4,
+    'sábado': 5,
+    'domingo': 6
+}
 
-def start_recording():
-    """Función para comenzar a grabar el audio"""
-    global stream, audio, frames
-    audio = pyaudio.PyAudio()
+# Lista para almacenar todas las alarmas
+alarm_list = []
 
-    # Iniciar la grabación
-    stream = audio.open(format=FORMAT, channels=CHANNELS,
-                        rate=RATE, input=True,
-                        frames_per_buffer=CHUNK)
+def add_alarm(alarm_time, days, concept):
+    for day in days:
+        # Verificar si ya existe una alarma en la misma hora y día
+        existing_alarm = next((alarm for alarm in alarm_list if alarm['time'] == alarm_time and day in alarm['days']), None)
 
-    print("Grabando audio...")
-    frames = []  # Limpiar frames anteriores
+        if existing_alarm:
+            # Concatenar el concepto si la alarma ya existe para ese día y hora
+            existing_alarm['concept'] += f", {concept}"
+            print(f"Alarma actualizada: {existing_alarm['concept']} a las {alarm_time} en el día {day}")
+        else:
+            # Crear una nueva alarma
+            alarm = {
+                'time': alarm_time,       # Hora de la alarma
+                'days': [day],            # Días de la semana para la alarma
+                'concept': concept        # Concepto o descripción de la alarma
+            }
+            alarm_list.append(alarm)
+            print(f"Alarma agregada: {concept} a las {alarm_time} en el día {day}")
 
-    def record_loop():
-        while recording_active:  # Mientras no se detenga la grabación
-            data = stream.read(CHUNK)
-            frames.append(data)
-
-    # Ejecutar la grabación en un hilo separado
-    global recording_thread
-    recording_thread = Thread(target=record_loop)
-    recording_thread.start()
-
-def stop_recording():
-    """Función para detener la grabación"""
-    global stream, audio
-
-    print("Grabación detenida.")
+def check_alarms():
     
-    global recording_active
-    recording_active = False  # Cambiar estado de la grabación
+    while True:
+        now = datetime.datetime.now()
+        current_day = now.weekday()  # Día de la semana actual (0=lunes, 6=domingo)
+        current_time = now.strftime("%H:%M")  # Hora actual en formato HH:MM
 
-    # Esperar a que el hilo termine
-    recording_thread.join()
+        # Verificar cada alarma en la lista
+        for alarm in alarm_list:
+            if current_day in alarm['days'] and current_time == alarm['time']:
+                print(f"¡Alarma activada! Concepto: {alarm['concept']}")
+                playsound('alarm.mp3')  # Reproduce el sonido de la alarma
+                time.sleep(60)  # Evitar que suene repetidamente en el mismo minuto
 
-    # Detener y cerrar el flujo de grabación
-    stream.stop_stream()
-    stream.close()
-    audio.terminate()
+        time.sleep(30)  # Verifica las alarmas cada 30 segundos
 
-    # Guardar el audio en un archivo WAV
-    with wave.open(OUTPUT_FILENAME, 'wb') as wf:
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(audio.get_sample_size(FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(frames))
+if __name__ == "__main__":
+    while True:
+        # Pedir al usuario la hora de la alarma
+        alarm_time = input("Introduce la hora de la alarma (HH:MM): ")
 
-    # Convertir el audio a texto
-    audio_to_text()
+        # Pedir los días de la semana
+        days_input = input("Introduce los días (ejemplo: lunes, martes, miércoles): ").lower().split(", ")
+        
+        # Pedir el concepto o descripción de la alarma
+        concept = input("Introduce el concepto de la alarma: ")
 
-def audio_to_text():
-    """Función para convertir el audio grabado a texto"""
-    recognizer = sr.Recognizer()
+        # Convertir los días ingresados a números de 0 (lunes) a 6 (domingo)
+        alarm_days = [DAYS_MAP[day.strip()] for day in days_input if day.strip() in DAYS_MAP]
 
-    # Leer el archivo de audio
-    with sr.AudioFile(OUTPUT_FILENAME) as source:
-        audio = recognizer.record(source)
+        # Agregar la alarma a la lista (verificará si existe o no una alarma con la misma hora y día)
+        add_alarm(alarm_time, alarm_days, concept)
 
-    try:
-        # Usar el reconocimiento de voz de Google para convertir a texto
-        text = recognizer.recognize_google(audio, language="es-ES")
-        print("Texto reconocido: " + text)
-    except sr.UnknownValueError:
-        print("No se pudo entender el audio")
-    except sr.RequestError as e:
-        print(f"Error al solicitar el servicio de reconocimiento: {e}")
+        # Preguntar si se quiere agregar otra alarma
+        more_alarms = input("¿Deseas agregar otra alarma? (sí/no): ").lower()
+        if more_alarms != 'sí':
+            break
 
-def on_start_button_click():
-    """Función que se ejecuta al hacer clic en el botón de iniciar grabación"""
-    global recording_active
-    recording_active = True
-    start_recording()
-
-def on_stop_button_click():
-    """Función que se ejecuta al hacer clic en el botón de detener grabación"""
-    stop_recording()
-
-# Crear la ventana con Tkinter
-root = tk.Tk()
-root.title("Grabadora de Audio")
-
-# Botón para iniciar la grabación
-start_button = tk.Button(root, text="Iniciar Grabación", command=on_start_button_click)
-start_button.pack(pady=20)
-
-# Botón para detener la grabación
-stop_button = tk.Button(root, text="Detener Grabación", command=on_stop_button_click)
-stop_button.pack(pady=20)
-
-# Ejecutar la ventana
-root.mainloop()
+    # Iniciar el proceso para revisar todas las alarmas
+    print("Comenzando a verificar alarmas...")
+    check_alarms()

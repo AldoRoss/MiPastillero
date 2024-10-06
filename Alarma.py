@@ -2,7 +2,6 @@ import datetime
 import time
 from playsound import playsound
 
-# Mapa de días de la semana
 DAYS_MAP = {
     'lunes': 0,
     'martes': 1,
@@ -13,7 +12,6 @@ DAYS_MAP = {
     'domingo': 6
 }
 
-# Lista para almacenar todas las alarmas
 alarm_list = []
 
 def add_alarm(alarm_time, days, concept):

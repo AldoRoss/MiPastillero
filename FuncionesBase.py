@@ -4,7 +4,8 @@ de este proyecto, aqui van a ir las funciones que se ocupen para desarrollar otr
 """
 import pyaudio
 import wave
-import keyboard 
+import tkinter as tk
+from threading import Thread
 import speech_recognition as sr
 
 # Configuración para grabar audio
@@ -13,9 +14,13 @@ CHANNELS = 1
 RATE = 44100
 CHUNK = 1024
 OUTPUT_FILENAME = "audio_recorded.wav"
+frames = []  # Para almacenar los fragmentos de audio
+stream = None
+audio = None
 
-def record_audio():
-    """Función para grabar audio desde el micrófono hasta que se presione una tecla"""
+def start_recording():
+    """Función para comenzar a grabar el audio"""
+    global stream, audio, frames
     audio = pyaudio.PyAudio()
 
     # Iniciar la grabación
@@ -23,19 +28,32 @@ def record_audio():
                         rate=RATE, input=True,
                         frames_per_buffer=CHUNK)
 
-    print("Grabando audio... Presiona 'Espacio' para detener la grabación.")
+    print("Grabando audio...")
+    frames = []  # Limpiar frames anteriores
 
-    frames = []
+    def record_loop():
+        while recording_active:  # Mientras no se detenga la grabación
+            data = stream.read(CHUNK)
+            frames.append(data)
 
-    # Grabar hasta que se presione la tecla "Espacio"
-    while True:
-        if keyboard.is_pressed('space'):  # Detener si se presiona 'Espacio'
-            print("Grabación terminada.")
-            break
-        data = stream.read(CHUNK)
-        frames.append(data)
+    # Ejecutar la grabación en un hilo separado
+    global recording_thread
+    recording_thread = Thread(target=record_loop)
+    recording_thread.start()
 
-    # Detener la grabación
+def stop_recording():
+    """Función para detener la grabación"""
+    global stream, audio
+
+    print("Grabación detenida.")
+    
+    global recording_active
+    recording_active = False  # Cambiar estado de la grabación
+
+    # Esperar a que el hilo termine
+    recording_thread.join()
+
+    # Detener y cerrar el flujo de grabación
     stream.stop_stream()
     stream.close()
     audio.terminate()
@@ -46,6 +64,9 @@ def record_audio():
         wf.setsampwidth(audio.get_sample_size(FORMAT))
         wf.setframerate(RATE)
         wf.writeframes(b''.join(frames))
+
+    # Convertir el audio a texto
+    audio_to_text()
 
 def audio_to_text():
     """Función para convertir el audio grabado a texto"""
@@ -64,15 +85,12 @@ def audio_to_text():
     except sr.RequestError as e:
         print(f"Error al solicitar el servicio de reconocimiento: {e}")
 
-def addAlarmVoice():
-    print('add Alarm with voice')
-    return None
+def on_start_button_click():
+    """Función que se ejecuta al hacer clic en el botón de iniciar grabación"""
+    global recording_active
+    recording_active = True
+    start_recording()
 
-if __name__ == "__main__":
-    # Grabar el audio sin duración predefinida, usando la tecla 'Espacio' para detener
-    record_audio()
-
-    # Convertir el audio a texto
-    audio_to_text()
- 
-
+def on_stop_button_click():
+    """Función que se ejecuta al hacer clic en el botón de detener grabación"""
+    stop_recording()
